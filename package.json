@@ -1,13 +1,14 @@
 {
   "name": "greek_sheets",
   "version": "1.0.0",
-  "description": "",
-  "main": "dist/index.js",
+  "description": "Minimalist A1-A2 Modern Greek vocabulary and phrase sheets for exam and speaking practice",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && node .build/build.js",
+    "preview": "npx --yes serve dist"
   },
   "dependencies": {},
   "devDependencies": {
+    "@types/node": "^22.10.0",
     "typescript": "^5.5.3"
   },
   "private": true
