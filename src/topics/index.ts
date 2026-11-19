@@ -12,6 +12,17 @@ import { travelTopic } from './travel';
 import { workTopic } from './work';
 import { weatherTopic } from './weather';
 import { questionsTopic } from './questions';
+import { cityTopic } from './city';
+import { emotionsTopic } from './emotions';
+import { holidaysTopic } from './holidays';
+import { techTopic } from './tech';
+import { moneyTopic } from './money';
+import { problemsTopic } from './problems';
+import { natureTopic } from './nature';
+import { quantitiesTopic } from './quantities';
+import { irregularVerbsTopic } from './irregular-verbs';
+import { emailsTopic } from './emails';
+import { studyTopic } from './study';
 
 export const topics: Topic[] = [
   homeTopic,
@@ -27,4 +38,15 @@ export const topics: Topic[] = [
   workTopic,
   weatherTopic,
   questionsTopic,
+  cityTopic,
+  emotionsTopic,
+  holidaysTopic,
+  techTopic,
+  moneyTopic,
+  problemsTopic,
+  natureTopic,
+  quantitiesTopic,
+  irregularVerbsTopic,
+  emailsTopic,
+  studyTopic,
 ];

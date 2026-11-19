@@ -1,4 +1,7 @@
 import { Topic, TopicSection, VocabItem } from './types';
+import { resolveVerbLemmas } from './verbs';
+import { dialoguesByTopic } from './topics/dialogues';
+import { MiniDialogue } from './verbs/types';
 
 function escapeHtml(str: string): string {
   return str
@@ -35,32 +38,59 @@ function renderHead(title: string, description: string, assetPrefix: string): st
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>${escapeHtml(title)}</title>
   <meta name="description" content="${escapeHtml(description)}" />
+  <meta name="theme-color" content="#1d4e89" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Greek Sheets" />
+  <link rel="manifest" href="${assetPrefix}manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="${assetPrefix}assets/icon.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="${assetPrefix}assets/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif:wght@400;600&display=swap" rel="stylesheet" />
+  <script>
+    (function(){try{var t=localStorage.getItem('greek-sheets-theme');if(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#121519');}}catch(e){}})();
+  </script>
   <link rel="stylesheet" href="${assetPrefix}assets/styles.css" />
 </head>`;
 }
 
-function renderEntry(item: VocabItem): string {
+function renderThemeToggle(): string {
+  return `<button id="theme-toggle" class="theme-toggle" type="button" title="Переключить тему" aria-label="Переключить тему">
+        <span class="theme-icon-sun" aria-hidden="true">☀</span>
+        <span class="theme-icon-moon" aria-hidden="true">☾</span>
+      </button>`;
+}
+
+function renderEntry(
+  topicSlug: string,
+  sectionId: string,
+  item: VocabItem,
+  isVerbSection: boolean
+): string {
   const levelClass = item.level === 'A1' ? 'badge-a1' : 'badge-a2';
   const searchBlob = `${item.el} ${item.ru} ${item.note ?? ''}`;
-  // Clean parenthetical hints or slash endings slightly for speech synthesis
   const speakText = item.el.replace(/,\s*-[^\s,]+/g, '').trim();
+  const favId = `${topicSlug}::${sectionId}::${item.el}`;
+  const verbLemmas = isVerbSection ? resolveVerbLemmas(item.el) : [];
+  const isVerb = verbLemmas.length > 0;
 
   return `
-    <article class="entry-card" data-level="${item.level}" data-search="${escapeHtml(searchBlob)}">
+    <article class="entry-card${isVerb ? ' is-verb' : ''}" data-level="${item.level}" data-search="${escapeHtml(searchBlob)}" data-fav-id="${escapeHtml(favId)}"${isVerb ? ` data-verbs="${escapeHtml(verbLemmas.join(','))}"` : ''}>
       <div class="entry-main">
         <div class="entry-el-row">
           <span class="entry-el" lang="el">${escapeHtml(item.el)}</span>
+          ${isVerb ? '<span class="verb-forms-pill" aria-hidden="true">формы ↗</span>' : ''}
         </div>
         <div class="entry-ru">${escapeHtml(item.ru)}</div>
         ${item.note ? `<div class="entry-note">${escapeHtml(item.note)}</div>` : ''}
       </div>
       <div class="entry-side">
+        <button class="fav-btn" type="button" data-fav-toggle="${escapeHtml(favId)}" title="Добавить в избранное" aria-label="Добавить в избранное" aria-pressed="false">☆</button>
         <button class="speak-btn" type="button" data-speak="${escapeHtml(speakText)}" title="Прослушать произношение" aria-label="Прослушать: ${escapeHtml(speakText)}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -73,8 +103,17 @@ function renderEntry(item: VocabItem): string {
     </article>`;
 }
 
-function renderSection(section: TopicSection): string {
-  const listClass = section.kind === 'phrases' ? 'phrase-list' : 'word-grid';
+function renderSection(topicSlug: string, section: TopicSection): string {
+  const isVerbSection =
+    section.id === 'verbs' ||
+    (topicSlug === 'irregular-verbs' && section.kind === 'words');
+  const isWideGrid = topicSlug === 'irregular-verbs' && section.kind === 'words';
+  const listClass =
+    section.kind === 'phrases'
+      ? 'phrase-list'
+      : isWideGrid
+        ? 'word-grid word-grid-wide'
+        : 'word-grid';
   return `
   <section class="vocab-section" id="${escapeHtml(section.id)}">
     <div class="section-header">
@@ -85,9 +124,155 @@ function renderSection(section: TopicSection): string {
       <span class="section-count">${section.items.length}</span>
     </div>
     <div class="${listClass}">
-      ${section.items.map(renderEntry).join('')}
+      ${section.items.map((item) => renderEntry(topicSlug, section.id, item, isVerbSection)).join('')}
     </div>
   </section>`;
+}
+
+function renderDialogue(dialogue: MiniDialogue): string {
+  const speakers = Array.from(new Set(dialogue.turns.map((t) => t.speaker)));
+  const turnsHtml = dialogue.turns
+    .map((turn, idx) => {
+      const sideClass = speakers.indexOf(turn.speaker) % 2 === 0 ? 'dialogue-turn-a' : 'dialogue-turn-b';
+      return `
+      <div class="dialogue-turn ${sideClass}" data-turn-index="${idx}">
+        <div class="dialogue-turn-head">
+          <span class="dialogue-speaker" lang="el">${escapeHtml(turn.speaker)}</span>
+          <button class="speak-btn" type="button" data-speak="${escapeHtml(turn.el)}" title="Прослушать реплику" aria-label="Прослушать: ${escapeHtml(turn.el)}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="dialogue-el" lang="el">${escapeHtml(turn.el)}</div>
+        <div class="dialogue-ru">${escapeHtml(turn.ru)}</div>
+      </div>`;
+    })
+    .join('');
+
+  return `
+  <section class="dialogue-section" id="dialogue">
+    <div class="section-header">
+      <div class="section-title-group">
+        <h2>${escapeHtml(dialogue.titleRu)}</h2>
+        <span class="section-el" lang="el">${escapeHtml(dialogue.titleEl)}</span>
+      </div>
+      <button id="play-dialogue-btn" class="tool-btn-outline dialogue-play-btn" type="button">
+        ▶ Прослушать диалог
+      </button>
+    </div>
+    <div class="dialogue-list">
+      ${turnsHtml}
+    </div>
+  </section>`;
+}
+
+function renderVerbModal(): string {
+  const personTabs = [
+    { idx: 0, ru: 'Я', el: 'εγώ' },
+    { idx: 1, ru: 'ТЫ', el: 'εσύ' },
+    { idx: 2, ru: 'ОН', el: 'αυτός / -ή / -ό' },
+    { idx: 3, ru: 'МЫ', el: 'εμείς' },
+    { idx: 4, ru: 'ВЫ', el: 'εσείς' },
+    { idx: 5, ru: 'ОНИ', el: 'αυτοί / -ές / -ά' },
+  ];
+
+  return `
+  <div id="verb-modal" class="verb-modal" role="dialog" aria-modal="true" aria-labelledby="verb-modal-lemma" hidden>
+    <div class="verb-backdrop" data-close-verb></div>
+    <div class="verb-dialog">
+      <div class="verb-topbar">
+        <div class="verb-title-wrap">
+          <div id="verb-switcher" class="verb-switcher" hidden></div>
+          <div class="verb-heading-row">
+            <h2 id="verb-modal-lemma" class="verb-modal-lemma" lang="el"></h2>
+            <button id="verb-lemma-speak" class="speak-btn" type="button" title="Прослушать глагол" aria-label="Прослушать глагол">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              </svg>
+            </button>
+          </div>
+          <div id="verb-modal-ru" class="verb-modal-ru"></div>
+        </div>
+        <button class="review-close" type="button" aria-label="Закрыть" data-close-verb>✕</button>
+      </div>
+
+      <div id="verb-person-tabs" class="verb-person-tabs" role="tablist" aria-label="Лицо и число">
+        ${personTabs
+          .map(
+            (p) => `
+          <button class="verb-person-tab${p.idx === 0 ? ' active' : ''}" type="button" role="tab" data-person-idx="${p.idx}" aria-selected="${p.idx === 0 ? 'true' : 'false'}">
+            <span class="verb-tab-ru">${p.ru}</span>
+            <span class="verb-tab-el" lang="el">${p.el}</span>
+          </button>`
+          )
+          .join('')}
+      </div>
+
+      <div class="verb-person-header">
+        <button id="verb-prev-person" class="verb-nav-arrow" type="button" aria-label="Предыдущее лицо">‹</button>
+        <div class="verb-person-heading">
+          <div id="verb-person-title" class="verb-person-title">Я (Εγώ)</div>
+          <div id="verb-person-sub" class="verb-person-sub">1-е лицо · Единственное число</div>
+        </div>
+        <button id="verb-next-person" class="verb-nav-arrow" type="button" aria-label="Следующее лицо">›</button>
+      </div>
+
+      <div id="verb-cube-viewport" class="verb-cube-viewport" aria-live="polite">
+        <div id="verb-cube" class="verb-cube">
+          <div id="verb-face-current" class="verb-cube-face"></div>
+          <div id="verb-face-next" class="verb-cube-face verb-cube-face-side"></div>
+          <div id="verb-face-prev" class="verb-cube-face verb-cube-face-side"></div>
+        </div>
+      </div>
+
+      <div class="verb-bottom-grid">
+        <div class="verb-info-card">
+          <div class="verb-info-title">ПОВЕЛИТЕЛЬНОЕ</div>
+          <div class="verb-imp-group">
+            <div class="verb-imp-sub">Разовое</div>
+            <div class="verb-imp-row">
+              <span>ед.ч.</span>
+              <button id="verb-imp-sg" class="verb-imp-val" type="button" lang="el"></button>
+            </div>
+            <div class="verb-imp-row">
+              <span>мн.ч.</span>
+              <button id="verb-imp-pl" class="verb-imp-val" type="button" lang="el"></button>
+            </div>
+          </div>
+          <div class="verb-imp-group">
+            <div class="verb-imp-sub">Длительное</div>
+            <div class="verb-imp-row">
+              <span>ед.ч.</span>
+              <button id="verb-imp-csg" class="verb-imp-val" type="button" lang="el"></button>
+            </div>
+            <div class="verb-imp-row">
+              <span>мн.ч.</span>
+              <button id="verb-imp-cpl" class="verb-imp-val" type="button" lang="el"></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="verb-info-card">
+          <div class="verb-info-title">ПРИЧАСТИЕ</div>
+          <div class="verb-part-block">
+            <div class="verb-imp-sub">активное</div>
+            <button id="verb-part-active" class="verb-part-val" type="button" lang="el"></button>
+          </div>
+          <div id="verb-part-passive-wrap" class="verb-part-block" hidden>
+            <div class="verb-imp-sub">страдательное</div>
+            <button id="verb-part-passive" class="verb-part-val" type="button" lang="el"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="verb-swipe-hint">Свайпните блок времён влево/вправо или нажмите на любую форму для озвучки</div>
+    </div>
+  </div>`;
 }
 
 export function renderIndexPage(topics: Topic[]): string {
@@ -124,20 +309,23 @@ export function renderIndexPage(topics: Topic[]): string {
     'Минималистичные тематические шпаргалки для изучения новогреческого языка уровня A1–A2.',
     './'
   )}
-<body>
+<body data-sw="./sw.js" data-assets="./assets/">
   <header class="topbar">
     <div class="container topbar-inner">
       <a class="brand" href="./">
         <span class="brand-mark" aria-hidden="true">Ελ</span>
         <span>Greek Sheets</span>
       </a>
-      <nav class="topbar-nav" aria-label="Темы">
-        ${topics
-          .map(
-            (t) => `<a class="topbar-pill" href="./${escapeHtml(t.slug)}/">${escapeHtml(t.titleRu)}</a>`
-          )
-          .join('')}
-      </nav>
+      <div class="topbar-actions">
+        <nav class="topbar-nav" aria-label="Темы">
+          ${topics
+            .map(
+              (t) => `<a class="topbar-pill" href="./${escapeHtml(t.slug)}/">${escapeHtml(t.titleRu)}</a>`
+            )
+            .join('')}
+        </nav>
+        ${renderThemeToggle()}
+      </div>
     </div>
   </header>
 
@@ -151,10 +339,46 @@ export function renderIndexPage(topics: Topic[]): string {
       <div class="hero-meta">
         <span class="badge badge-a1">${pluralRu(topics.length, 'тема', 'темы', 'тем')}</span>
         <span class="badge badge-muted">${pluralRu(totalEntries, 'выражение', 'выражения', 'выражений')}</span>
+        <button id="install-app-btn" class="install-btn" type="button" hidden>
+          <span aria-hidden="true">↓</span>
+          <span>Установить на телефон</span>
+        </button>
+      </div>
+      <div id="ios-install-hint" class="ios-install-hint" hidden>
+        <div>
+          <strong>Установка на iPhone / iPad:</strong> нажмите кнопку <strong>«Поделиться»</strong> внизу экрана и выберите <strong>«На экран „Домой“»</strong>. Приложение будет работать даже офлайн.
+        </div>
+        <button id="ios-hint-close" class="ios-hint-close" type="button" aria-label="Закрыть подсказку">✕</button>
       </div>
     </section>
 
-    <section class="topics-grid" aria-label="Список тем">
+    <section class="home-search-bar" aria-label="Глобальный поиск и избранное">
+      <div class="search-wrap">
+        <input
+          id="global-search-input"
+          class="search-input"
+          type="search"
+          placeholder="Поиск по всем ${topics.length} темам (на русском или греческом)..."
+          autocomplete="off"
+        />
+      </div>
+      <button id="home-fav-toggle" class="tool-btn-outline" type="button" aria-pressed="false">
+        ★ Избранное <span id="home-fav-count" class="fav-count-pill">0</span>
+      </button>
+    </section>
+
+    <section id="global-results-panel" class="global-results-panel" hidden>
+      <div class="global-results-header">
+        <h2 id="global-results-title">Результаты поиска</h2>
+        <button id="global-results-clear" class="tool-btn-outline" type="button">Показать все темы</button>
+      </div>
+      <div id="global-results-list" class="phrase-list"></div>
+      <div id="global-results-empty" class="empty-state">
+        Ничего не найдено.
+      </div>
+    </section>
+
+    <section id="topics-grid" class="topics-grid" aria-label="Список тем">
       ${cardsHtml}
     </section>
 
@@ -168,8 +392,8 @@ export function renderIndexPage(topics: Topic[]): string {
         <span>Нажмите на значок динамика рядом со словом, чтобы услышать произношение.</span>
       </div>
       <div class="guide-item">
-        <strong>Удобно печатать</strong>
-        <span>Каждая тема сверстана как аккуратный лист-шпаргалка для печати или PDF.</span>
+        <strong>Работает офлайн</strong>
+        <span>Установите сайт на экран телефона как приложение — все темы доступны без интернета.</span>
       </div>
     </section>
   </main>
@@ -180,6 +404,10 @@ export function renderIndexPage(topics: Topic[]): string {
       <span>Ελληνικά για κάθε μέρα</span>
     </div>
   </footer>
+
+  ${renderVerbModal()}
+
+  <script src="./assets/app.js"></script>
 </body>
 </html>
 `;
@@ -188,6 +416,7 @@ export function renderIndexPage(topics: Topic[]): string {
 export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
   const counts = countItems(topic);
   const otherTopics = allTopics.filter((t) => t.slug !== topic.slug);
+  const dialogue = dialoguesByTopic[topic.slug];
 
   const levelsHtml = topic.levels
     .map((lvl) => `<span class="badge ${lvl === 'A1' ? 'badge-a1' : 'badge-a2'}">${lvl}</span>`)
@@ -215,18 +444,21 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
     topic.subtitle,
     '../'
   )}
-<body data-accent="${topic.accent}">
+<body data-accent="${topic.accent}" data-sw="../sw.js" data-assets="../assets/">
   <header class="topbar">
     <div class="container topbar-inner">
       <a class="back-link" href="../">← Все темы</a>
-      <nav class="topbar-nav" aria-label="Переключение тем">
-        ${allTopics
-          .map(
-            (t) =>
-              `<a class="topbar-pill ${t.slug === topic.slug ? 'active' : ''}" href="../${escapeHtml(t.slug)}/">${escapeHtml(t.titleRu)}</a>`
-          )
-          .join('')}
-      </nav>
+      <div class="topbar-actions">
+        <nav class="topbar-nav" aria-label="Переключение тем">
+          ${allTopics
+            .map(
+              (t) =>
+                `<a class="topbar-pill ${t.slug === topic.slug ? 'active' : ''}" href="../${escapeHtml(t.slug)}/">${escapeHtml(t.titleRu)}</a>`
+            )
+            .join('')}
+        </nav>
+        ${renderThemeToggle()}
+      </div>
     </div>
   </header>
 
@@ -258,6 +490,7 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
         <button class="tool-btn" type="button" data-level-filter="A1">A1</button>
         <button class="tool-btn" type="button" data-level-filter="A2">A2</button>
       </div>
+      <button id="fav-filter-btn" class="tool-btn-outline" type="button" aria-pressed="false">★ Избранное</button>
       <button id="mask-el-btn" class="tool-btn-outline" type="button">Скрыть греческий</button>
       <button id="mask-ru-btn" class="tool-btn-outline" type="button">Скрыть перевод</button>
       <button id="review-btn" class="tool-btn-primary" type="button">Повторить</button>
@@ -270,6 +503,7 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
           (s) => `<a class="jump-link" href="#${escapeHtml(s.id)}">${escapeHtml(s.titleRu)}</a>`
         )
         .join('')}
+      ${dialogue ? '<a class="jump-link jump-link-dialogue" href="#dialogue">Мини-диалог</a>' : ''}
     </nav>
 
     ${tipHtml}
@@ -278,7 +512,9 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
       По вашему запросу ничего не найдено. Попробуйте очистить поиск или переключить уровень.
     </div>
 
-    ${topic.sections.map(renderSection).join('')}
+    ${topic.sections.map((s) => renderSection(topic.slug, s)).join('')}
+
+    ${dialogue ? renderDialogue(dialogue) : ''}
 
     ${
       otherTopics.length > 0
@@ -371,6 +607,8 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
       </div>
     </div>
   </div>
+
+  ${renderVerbModal()}
 
   <script src="../assets/app.js"></script>
 </body>
