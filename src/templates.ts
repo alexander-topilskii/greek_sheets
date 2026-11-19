@@ -260,6 +260,7 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
       </div>
       <button id="mask-el-btn" class="tool-btn-outline" type="button">Скрыть греческий</button>
       <button id="mask-ru-btn" class="tool-btn-outline" type="button">Скрыть перевод</button>
+      <button id="review-btn" class="tool-btn-primary" type="button">Повторить</button>
       <button id="print-btn" class="tool-btn-outline" type="button">Печать</button>
     </div>
 
@@ -303,6 +304,73 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
       <span>Подсказка: в режиме скрытия кликните на карточку, чтобы подсмотреть ответ</span>
     </div>
   </footer>
+
+  <div id="review-modal" class="review-modal" role="dialog" aria-modal="true" aria-labelledby="review-title" hidden>
+    <div class="review-backdrop" data-close-review></div>
+    <div class="review-dialog">
+      <div class="review-header">
+        <div class="review-header-left">
+          <span id="review-title" class="review-title">Повторение</span>
+          <span id="review-progress-text" class="badge badge-muted">1 / 1</span>
+        </div>
+        <div class="review-header-right">
+          <button id="review-shuffle-btn" class="tool-btn-outline" type="button" title="Перемешать карточки">Перемешать</button>
+          <button id="review-close-btn" class="review-close" type="button" aria-label="Закрыть" data-close-review>✕</button>
+        </div>
+      </div>
+
+      <div class="review-progress-track" aria-hidden="true">
+        <div id="review-progress-bar" class="review-progress-bar"></div>
+      </div>
+
+      <div id="review-stage" class="review-stage">
+        <div id="flashcard" class="flashcard" role="button" tabindex="0" aria-label="Перевернуть карточку">
+          <div class="flashcard-face flashcard-front">
+            <div class="flashcard-meta">
+              <span id="card-section-front" class="flashcard-section"></span>
+              <span id="card-level-front" class="badge badge-a1">A1</span>
+            </div>
+            <div class="flashcard-lang">Русский</div>
+            <div id="card-ru" class="flashcard-text"></div>
+            <div class="flashcard-hint">Нажмите на карточку, чтобы перевернуть</div>
+          </div>
+          <div class="flashcard-face flashcard-back">
+            <div class="flashcard-meta">
+              <span id="card-section-back" class="flashcard-section"></span>
+              <span id="card-level-back" class="badge badge-a1">A1</span>
+            </div>
+            <div class="flashcard-lang">Ελληνικά</div>
+            <div id="card-el" class="flashcard-text flashcard-text-el" lang="el"></div>
+            <div id="card-note" class="flashcard-note"></div>
+            <button id="card-speak-btn" class="speak-btn flashcard-speak" type="button" title="Прослушать произношение" aria-label="Прослушать произношение">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              </svg>
+              <span>Озвучить</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="review-done" class="review-done" hidden>
+        <div class="review-done-icon" aria-hidden="true">✓</div>
+        <h3>Отлично! Все карточки пройдены</h3>
+        <p id="review-done-summary"></p>
+        <div class="review-done-actions">
+          <button id="review-restart-btn" class="tool-btn-primary" type="button">Пройти ещё раз</button>
+          <button class="tool-btn-outline" type="button" data-close-review>Вернуться к листу</button>
+        </div>
+      </div>
+
+      <div id="review-controls" class="review-controls">
+        <button id="review-prev-btn" class="tool-btn-outline" type="button">← Назад</button>
+        <button id="review-flip-btn" class="tool-btn-outline" type="button">Перевернуть</button>
+        <button id="review-next-btn" class="tool-btn-primary" type="button">Дальше →</button>
+      </div>
+    </div>
+  </div>
 
   <script src="../assets/app.js"></script>
 </body>
