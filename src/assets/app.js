@@ -302,7 +302,9 @@
   }
 
   // Pronunciation via Web Speech API (el-GR)
-  const speakButtons = document.querySelectorAll('.entry-card .speak-btn, .dialogue-turn .speak-btn');
+  const speakButtons = document.querySelectorAll(
+    '.entry-card .speak-btn, .dialogue-turn .speak-btn, .question-card .speak-btn'
+  );
   if ('speechSynthesis' in window) {
     speakButtons.forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -317,6 +319,94 @@
       btn.style.display = 'none';
     });
   }
+
+  // Lesson Questions: blur reveal
+  document.querySelectorAll('.question-card').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.speak-btn')) return;
+      if (
+        document.body.classList.contains('mask-el') ||
+        document.body.classList.contains('mask-ru')
+      ) {
+        card.classList.toggle('revealed');
+      }
+    });
+  });
+
+  // Lesson Exercises: interactive cloze practice, translation toggle & TTS
+  document.querySelectorAll('.exercise-section').forEach((section) => {
+    const card = section.querySelector('.exercise-card');
+    const practiceBtn = section.querySelector('.exercise-practice-btn');
+    const transBtn = section.querySelector('.exercise-trans-btn');
+    const speakBtn = section.querySelector('.exercise-speak-btn');
+    const blanks = Array.from(section.querySelectorAll('.cloze-blank'));
+    const ruParas = Array.from(section.querySelectorAll('.exercise-para-ru'));
+
+    if (practiceBtn && card) {
+      practiceBtn.addEventListener('click', () => {
+        const next = !card.classList.contains('is-practice');
+        card.classList.toggle('is-practice', next);
+        practiceBtn.classList.toggle('active', next);
+        practiceBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+        practiceBtn.textContent = next ? 'Показать все ответы' : 'Режим тренировки';
+        blanks.forEach((b) => b.classList.remove('is-revealed'));
+      });
+    }
+
+    blanks.forEach((blank) => {
+      blank.addEventListener('click', () => {
+        if (card && card.classList.contains('is-practice')) {
+          blank.classList.toggle('is-revealed');
+        } else {
+          speakGreek(blank.textContent.trim());
+        }
+      });
+    });
+
+    if (transBtn) {
+      transBtn.addEventListener('click', () => {
+        const next = !transBtn.classList.contains('active');
+        transBtn.classList.toggle('active', next);
+        transBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+        ruParas.forEach((p) => {
+          p.hidden = !next;
+        });
+      });
+    }
+
+    if (speakBtn) {
+      if (!('speechSynthesis' in window)) {
+        speakBtn.style.display = 'none';
+      } else {
+        let reading = false;
+        speakBtn.addEventListener('click', () => {
+          if (reading) {
+            window.speechSynthesis.cancel();
+            reading = false;
+            speakBtn.textContent = '▶ Прослушать';
+            return;
+          }
+          const text = speakBtn.getAttribute('data-speak-text');
+          if (!text) return;
+          window.speechSynthesis.cancel();
+          const utt = new SpeechSynthesisUtterance(text);
+          utt.lang = 'el-GR';
+          utt.rate = 0.9;
+          reading = true;
+          speakBtn.textContent = '■ Остановить';
+          utt.onend = () => {
+            reading = false;
+            speakBtn.textContent = '▶ Прослушать';
+          };
+          utt.onerror = () => {
+            reading = false;
+            speakBtn.textContent = '▶ Прослушать';
+          };
+          window.speechSynthesis.speak(utt);
+        });
+      }
+    }
+  });
 
   // Mini-Dialogue playback & blur reveal
   const dialogueTurns = Array.from(document.querySelectorAll('.dialogue-turn'));
@@ -394,6 +484,7 @@
   const globalResultsList = document.getElementById('global-results-list');
   const globalResultsEmpty = document.getElementById('global-results-empty');
   const globalResultsClear = document.getElementById('global-results-clear');
+  const homeBrowseContent = document.getElementById('home-browse-content');
   const topicsGrid = document.getElementById('topics-grid');
 
   let searchIndexPromise = null;
@@ -437,7 +528,7 @@
         </div>
         <div class="entry-ru">${escapeText(item.ru)}</div>
         ${item.note ? `<div class="entry-note">${escapeText(item.note)}</div>` : ''}
-        <a class="result-topic-link" href="./${escapeText(item.topicSlug)}/#${escapeText(item.sectionId)}">
+        <a class="result-topic-link" href="${escapeText(item.href || `./${item.topicSlug}/#${item.sectionId}`)}">
           ${escapeText(item.topicTitle)} · ${escapeText(item.sectionTitle)} →
         </a>
       </div>
@@ -491,13 +582,14 @@
   }
 
   async function renderHomeResults() {
-    if (!globalResultsPanel || !globalResultsList || !topicsGrid) return;
+    const browseContainer = homeBrowseContent || topicsGrid;
+    if (!globalResultsPanel || !globalResultsList || !browseContainer) return;
     const rawQuery = globalSearchInput ? globalSearchInput.value.trim() : '';
     const q = normalize(rawQuery);
     const active = Boolean(q) || homeShowFavorites;
 
     globalResultsPanel.hidden = !active;
-    topicsGrid.hidden = active;
+    browseContainer.hidden = active;
 
     if (!active) return;
 
