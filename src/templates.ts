@@ -269,10 +269,100 @@ function renderVerbModal(): string {
           </div>
         </div>
       </div>
-
-      <div class="verb-swipe-hint">Свайпните блок времён влево/вправо или нажмите на любую форму для озвучки</div>
     </div>
   </div>`;
+}
+
+function renderToolsMenu(opts: {
+  searchPlaceholder: string;
+  showLevels: boolean;
+  jumps: { href: string; label: string }[];
+  extraLinks?: { href: string; label: string }[];
+}): string {
+  return `
+  <div id="tools-menu" class="tools-menu" hidden>
+    <div class="tools-menu-backdrop" data-close-tools></div>
+    <div class="tools-menu-sheet" role="dialog" aria-label="Фильтры и разделы">
+      <div class="tools-menu-head">
+        <span>Фильтры и навигация</span>
+        <button class="review-close" type="button" aria-label="Закрыть меню" data-close-tools>✕</button>
+      </div>
+
+      <div class="tools-menu-block">
+        <input
+          id="search-input"
+          class="search-input"
+          type="search"
+          placeholder="${escapeHtml(opts.searchPlaceholder)}"
+          autocomplete="off"
+        />
+      </div>
+
+      ${
+        opts.showLevels
+          ? `<div class="tools-menu-block">
+              <div class="tools-menu-label">Уровень</div>
+              <div class="toolbar-group" role="group" aria-label="Фильтр по уровню">
+                <button class="tool-btn active" type="button" data-level-filter="all">Все</button>
+                <button class="tool-btn" type="button" data-level-filter="A1">A1</button>
+                <button class="tool-btn" type="button" data-level-filter="A2">A2</button>
+              </div>
+            </div>`
+          : ''
+      }
+
+      <div class="tools-menu-block">
+        <div class="tools-menu-label">Режимы</div>
+        <div class="tools-menu-pills">
+          <button id="fav-filter-btn" class="tool-btn-outline" type="button" aria-pressed="false">★ Избранное</button>
+          <button id="mask-el-btn" class="tool-btn-outline" type="button">Скрыть греческий</button>
+          <button id="mask-ru-btn" class="tool-btn-outline" type="button">Скрыть перевод</button>
+          <button id="print-btn" class="tool-btn-outline" type="button">Печать</button>
+        </div>
+      </div>
+
+      ${
+        opts.jumps.length > 0
+          ? `<div class="tools-menu-block">
+              <div class="tools-menu-label">Разделы</div>
+              <nav class="tools-menu-pills" aria-label="Разделы">
+                ${opts.jumps
+                  .map(
+                    (j) => `<a class="jump-link" href="${escapeHtml(j.href)}" data-close-tools>${escapeHtml(j.label)}</a>`
+                  )
+                  .join('')}
+              </nav>
+            </div>`
+          : ''
+      }
+
+      ${
+        opts.extraLinks && opts.extraLinks.length > 0
+          ? `<div class="tools-menu-block">
+              <div class="tools-menu-label">Перейти</div>
+              <div class="tools-menu-pills">
+                ${opts.extraLinks
+                  .map(
+                    (l) => `<a class="jump-link" href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`
+                  )
+                  .join('')}
+              </div>
+            </div>`
+          : ''
+      }
+    </div>
+  </div>`;
+}
+
+function renderToolsMenuTrigger(): string {
+  return `<button id="tools-menu-btn" class="icon-btn" type="button" aria-expanded="false" aria-controls="tools-menu" title="Поиск, фильтры и разделы" aria-label="Поиск, фильтры и разделы">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="4" y1="6" x2="20" y2="6"></line>
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="18" x2="14" y2="18"></line>
+          </svg>
+          <span id="tools-active-dot" class="tools-active-dot" hidden></span>
+        </button>`;
 }
 
 function renderGrammarCard(tip: GrammarTip): string {
@@ -383,16 +473,15 @@ function renderExercise(exercise: LessonExercise): string {
         <span class="section-el" lang="el">${escapeHtml(exercise.titleEl)}</span>
       </div>
       <div class="exercise-actions">
-        <button class="tool-btn-outline exercise-practice-btn" type="button" aria-pressed="false">Режим тренировки</button>
+        <button class="tool-btn-outline exercise-practice-btn" type="button" aria-pressed="false">Тренировка</button>
         <button class="tool-btn-outline exercise-trans-btn" type="button" aria-pressed="false">Перевод</button>
-        <button class="tool-btn-outline exercise-speak-btn" type="button" data-speak-text="${escapeHtml(plainGreekText)}">▶ Прослушать</button>
+        <button class="tool-btn-outline exercise-speak-btn" type="button" data-speak-text="${escapeHtml(plainGreekText)}">▶</button>
       </div>
     </div>
 
     <div class="exercise-card">
       <div class="exercise-instruction">
         <strong lang="el">${escapeHtml(exercise.instructionEl)}</strong>
-        <span>${escapeHtml(exercise.instructionRu)}</span>
       </div>
       ${
         exercise.wordBank && exercise.wordBank.length > 0
@@ -423,29 +512,19 @@ function renderExercise(exercise: LessonExercise): string {
 }
 
 export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
-  const totalEntries = topics.reduce((sum, t) => sum + countItems(t).total, 0);
-
   const cardsHtml = topics
     .map((topic) => {
       const counts = countItems(topic);
-      const levelsHtml = topic.levels
-        .map((lvl) => `<span class="badge ${lvl === 'A1' ? 'badge-a1' : 'badge-a2'}">${lvl}</span>`)
-        .join('');
 
       return `
-      <a class="topic-card" href="./${escapeHtml(topic.slug)}/" data-accent="${topic.accent}">
-        <div>
-          <div class="topic-card-top">
-            <span class="topic-icon" aria-hidden="true">${topic.icon}</span>
-            <div class="topic-card-levels">${levelsHtml}</div>
+      <a class="topic-card topic-card-compact" href="./${escapeHtml(topic.slug)}/" data-accent="${topic.accent}">
+        <div class="topic-card-row">
+          <span class="topic-icon" aria-hidden="true">${topic.icon}</span>
+          <div class="topic-card-body">
+            <h2>${escapeHtml(topic.titleRu)}</h2>
+            <div class="topic-card-el" lang="el">${escapeHtml(topic.titleEl)}</div>
           </div>
-          <h2>${escapeHtml(topic.titleRu)}</h2>
-          <div class="topic-card-el" lang="el">${escapeHtml(topic.titleEl)}</div>
-          <p>${escapeHtml(topic.subtitle)}</p>
-        </div>
-        <div class="topic-card-footer">
-          <span>${pluralRu(counts.words, 'слово', 'слова', 'слов')} · ${pluralRu(counts.phrases, 'фраза', 'фразы', 'фраз')}</span>
-          <span class="topic-card-cta">Открыть →</span>
+          <span class="topic-card-count">${counts.total}</span>
         </div>
       </a>`;
     })
@@ -453,13 +532,6 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
 
   const lessonPreviewHtml = lessons
     .map((lesson) => {
-      const wordCount = lesson.sections.reduce((s, sec) => s + sec.items.length, 0);
-      const qCount = lesson.questions ? lesson.questions.items.length : 0;
-      const exCount = lesson.exercises ? lesson.exercises.length : 0;
-      const metaParts = [pluralRu(wordCount, 'слово', 'слова', 'слов')];
-      if (qCount > 0) metaParts.push(pluralRu(qCount, 'вопрос', 'вопроса', 'вопросов'));
-      if (exCount > 0) metaParts.push(pluralRu(exCount, 'текст', 'текста', 'текстов'));
-
       return `
       <a class="lesson-preview-card" href="./lessons/${escapeHtml(lesson.slug)}/" data-accent="${lesson.accent}">
         <div class="lesson-preview-top">
@@ -468,17 +540,13 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
         </div>
         <div class="lesson-preview-title">${escapeHtml(lesson.titleRu)}</div>
         <div class="lesson-preview-el" lang="el">${escapeHtml(lesson.titleEl)}</div>
-        <div class="lesson-preview-foot">
-          <span>${metaParts.join(' · ')}</span>
-          <span class="topic-card-cta">Открыть →</span>
-        </div>
       </a>`;
     })
     .join('');
 
   return `${renderHead(
-    'Greek Sheets — Слова и фразы на греческом (A1–A2)',
-    'Минималистичные тематические шпаргалки для изучения новогреческого языка уровня A1–A2.',
+    'Greek Sheets — Ελληνικά A1–A2',
+    'Тематические листы и уроки для изучения новогреческого языка уровня A1–A2.',
     './'
   )}
 <body data-sw="./sw.js" data-assets="./assets/">
@@ -489,62 +557,43 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
         <span>Greek Sheets</span>
       </a>
       <div class="topbar-actions">
-        <nav class="topbar-nav" aria-label="Темы">
-          <a class="topbar-pill topbar-pill-lessons" href="./lessons/">Уроки (${lessons.length})</a>
-          ${topics
-            .map(
-              (t) => `<a class="topbar-pill" href="./${escapeHtml(t.slug)}/">${escapeHtml(t.titleRu)}</a>`
-            )
-            .join('')}
-        </nav>
+        <a class="topbar-pill topbar-pill-lessons" href="./lessons/">Уроки</a>
+        <button id="home-fav-toggle" class="icon-btn icon-btn-fav" type="button" aria-pressed="false" title="Избранное" aria-label="Избранное">
+          <span aria-hidden="true">★</span>
+          <span id="home-fav-count" class="icon-badge">0</span>
+        </button>
+        <button id="home-search-toggle" class="icon-btn" type="button" aria-expanded="false" aria-controls="home-search-drawer" title="Поиск" aria-label="Поиск">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+        <button id="install-app-btn" class="icon-btn" type="button" title="Установить на телефон" aria-label="Установить на телефон" hidden>↓</button>
         ${renderThemeToggle()}
       </div>
     </div>
   </header>
 
-  <main class="container">
-    <section class="hero">
-      <div class="hero-eyebrow">Ελληνικά · A1–A2</div>
-      <h1>Тематические листы по греческому</h1>
-      <p class="hero-desc">
-        Короткие и понятные подборки слов, глаголов и живых фраз для подготовки к экзаменам Ελληνομάθεια A1–A2 и конспекты уроков с преподавателем.
-      </p>
-      <div class="hero-meta">
-        <a class="badge badge-a1" href="./lessons/">${pluralRu(lessons.length, 'урок', 'урока', 'уроков')}</a>
-        <span class="badge badge-a2">${pluralRu(topics.length, 'тема', 'темы', 'тем')}</span>
-        <span class="badge badge-muted">${pluralRu(totalEntries, 'выражение', 'выражения', 'выражений')}</span>
-        <button id="install-app-btn" class="install-btn" type="button" hidden>
-          <span aria-hidden="true">↓</span>
-          <span>Установить на телефон</span>
-        </button>
-      </div>
-      <div id="ios-install-hint" class="ios-install-hint" hidden>
-        <div>
-          <strong>Установка на iPhone / iPad:</strong> нажмите кнопку <strong>«Поделиться»</strong> внизу экрана и выберите <strong>«На экран „Домой“»</strong>. Приложение будет работать даже офлайн.
-        </div>
-        <button id="ios-hint-close" class="ios-hint-close" type="button" aria-label="Закрыть подсказку">✕</button>
-      </div>
-    </section>
+  <main class="container page-main">
+    <div id="ios-install-hint" class="ios-install-hint" hidden>
+      <div><strong>На iPhone:</strong> «Поделиться» → «На экран „Домой“»</div>
+      <button id="ios-hint-close" class="ios-hint-close" type="button" aria-label="Закрыть">✕</button>
+    </div>
 
-    <section class="home-search-bar" aria-label="Глобальный поиск и избранное">
-      <div class="search-wrap">
-        <input
-          id="global-search-input"
-          class="search-input"
-          type="search"
-          placeholder="Поиск по всем темам и урокам (на русском или греческом)..."
-          autocomplete="off"
-        />
-      </div>
-      <button id="home-fav-toggle" class="tool-btn-outline" type="button" aria-pressed="false">
-        ★ Избранное <span id="home-fav-count" class="fav-count-pill">0</span>
-      </button>
-    </section>
+    <div id="home-search-drawer" class="home-search-drawer" hidden>
+      <input
+        id="global-search-input"
+        class="search-input"
+        type="search"
+        placeholder="Поиск по темам и урокам..."
+        autocomplete="off"
+      />
+    </div>
 
     <section id="global-results-panel" class="global-results-panel" hidden>
       <div class="global-results-header">
-        <h2 id="global-results-title">Результаты поиска</h2>
-        <button id="global-results-clear" class="tool-btn-outline" type="button">Показать всё</button>
+        <h2 id="global-results-title">Результаты</h2>
+        <button id="global-results-clear" class="tool-btn-outline" type="button">Закрыть</button>
       </div>
       <div id="global-results-list" class="phrase-list"></div>
       <div id="global-results-empty" class="empty-state">
@@ -553,13 +602,13 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
     </section>
 
     <div id="home-browse-content">
-      <section class="home-lessons-block" aria-label="Уроки с преподавателем">
+      <section class="home-lessons-block" aria-label="Уроки">
         <div class="home-block-header">
           <div class="home-block-title-group">
-            <h2>Уроки с преподавателем</h2>
+            <h2>Уроки</h2>
             <span class="section-el" lang="el">Μαθήματα</span>
           </div>
-          <a class="home-block-link" href="./lessons/">Все уроки (${lessons.length}) →</a>
+          <a class="home-block-link" href="./lessons/">Все (${lessons.length}) →</a>
         </div>
         <div class="lessons-preview-grid">
           ${lessonPreviewHtml}
@@ -568,8 +617,8 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
 
       <div class="home-block-header">
         <div class="home-block-title-group">
-          <h2>Тематические листы</h2>
-          <span class="section-el" lang="el">Θεματικά φύλλα</span>
+          <h2>Темы</h2>
+          <span class="section-el" lang="el">Θέματα A1–A2</span>
         </div>
         <span class="section-count">${topics.length}</span>
       </div>
@@ -578,29 +627,7 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
         ${cardsHtml}
       </section>
     </div>
-
-    <section class="study-guide" aria-label="Как пользоваться">
-      <div class="guide-item">
-        <strong>Режим самопроверки</strong>
-        <span>На любой странице можно скрыть греческий или перевод и открывать карточки кликом.</span>
-      </div>
-      <div class="guide-item">
-        <strong>Озвучка фраз</strong>
-        <span>Нажмите на значок динамика рядом со словом, чтобы услышать произношение.</span>
-      </div>
-      <div class="guide-item">
-        <strong>Работает офлайн</strong>
-        <span>Установите сайт на экран телефона как приложение — все темы доступны без интернета.</span>
-      </div>
-    </section>
   </main>
-
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <span>Greek Sheets · Новогреческий язык A1–A2</span>
-      <span>Ελληνικά για κάθε μέρα</span>
-    </div>
-  </footer>
 
   ${renderVerbModal()}
 
@@ -611,30 +638,35 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
 }
 
 export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
-  const counts = countItems(topic);
   const otherTopics = allTopics.filter((t) => t.slug !== topic.slug);
   const dialogue = dialoguesByTopic[topic.slug];
 
-  const levelsHtml = topic.levels
-    .map((lvl) => `<span class="badge ${lvl === 'A1' ? 'badge-a1' : 'badge-a2'}">${lvl}</span>`)
-    .join('');
-
   const tipHtml = topic.tip
     ? `
-    <aside class="tip-card">
-      <div class="tip-label">Σημείωση · Подсказка</div>
-      <h3>${escapeHtml(topic.tip.title)}</h3>
-      <p>${escapeHtml(topic.tip.body)}</p>
-      <div class="tip-examples">
-        ${topic.tip.examples
-          .map(
-            (ex) =>
-              `<div class="tip-example"><strong lang="el">${escapeHtml(ex.el)}</strong> — <span>${escapeHtml(ex.ru)}</span></div>`
-          )
-          .join('')}
+    <details class="tip-collapsible">
+      <summary class="tip-collapsible-summary">
+        <span class="tip-label-inline">Σημείωση</span>
+        <span class="tip-summary-title">${escapeHtml(topic.tip.title)}</span>
+        <span class="tip-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="tip-collapsible-body">
+        <p>${escapeHtml(topic.tip.body)}</p>
+        <div class="tip-examples">
+          ${topic.tip.examples
+            .map(
+              (ex) =>
+                `<div class="tip-example"><strong lang="el">${escapeHtml(ex.el)}</strong> — <span>${escapeHtml(ex.ru)}</span></div>`
+            )
+            .join('')}
+        </div>
       </div>
-    </aside>`
+    </details>`
     : '';
+
+  const jumps = [
+    ...topic.sections.map((s) => ({ href: `#${s.id}`, label: s.titleRu })),
+    ...(dialogue ? [{ href: '#dialogue', label: 'Мини-диалог' }] : []),
+  ];
 
   return `${renderHead(
     `${topic.titleRu} (${topic.titleEl}) — Greek Sheets`,
@@ -644,69 +676,30 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
 <body data-accent="${topic.accent}" data-sw="../sw.js" data-assets="../assets/">
   <header class="topbar">
     <div class="container topbar-inner">
-      <a class="back-link" href="../">← Все темы</a>
+      <a class="back-link" href="../">← Темы</a>
       <div class="topbar-actions">
-        <nav class="topbar-nav" aria-label="Переключение тем">
-          ${allTopics
-            .map(
-              (t) =>
-                `<a class="topbar-pill ${t.slug === topic.slug ? 'active' : ''}" href="../${escapeHtml(t.slug)}/">${escapeHtml(t.titleRu)}</a>`
-            )
-            .join('')}
-        </nav>
+        <button id="review-btn" class="tool-btn-primary" type="button">Повторить</button>
+        ${renderToolsMenuTrigger()}
         ${renderThemeToggle()}
       </div>
     </div>
   </header>
 
-  <main class="container">
-    <section class="hero">
-      <div class="hero-eyebrow">${topic.icon} Тематический лист</div>
+  <main class="container page-main">
+    <header class="page-head">
       <h1>${escapeHtml(topic.titleRu)}</h1>
-      <div class="hero-el" lang="el">${escapeHtml(topic.titleEl)}</div>
-      <p class="hero-desc">${escapeHtml(topic.subtitle)}</p>
-      <div class="hero-meta">
-        ${levelsHtml}
-        <span class="badge badge-muted">${pluralRu(counts.words, 'слово', 'слова', 'слов')}</span>
-        <span class="badge badge-muted">${pluralRu(counts.phrases, 'фраза', 'фразы', 'фраз')}</span>
-      </div>
-    </section>
+      <div class="page-head-el" lang="el">${escapeHtml(topic.titleEl)}</div>
+    </header>
 
-    <div class="toolbar" role="region" aria-label="Инструменты изучения">
-      <div class="search-wrap">
-        <input
-          id="search-input"
-          class="search-input"
-          type="search"
-          placeholder="Поиск на греческом или русском..."
-          autocomplete="off"
-        />
-      </div>
-      <div class="toolbar-group" role="group" aria-label="Фильтр по уровню">
-        <button class="tool-btn active" type="button" data-level-filter="all">Все</button>
-        <button class="tool-btn" type="button" data-level-filter="A1">A1</button>
-        <button class="tool-btn" type="button" data-level-filter="A2">A2</button>
-      </div>
-      <button id="fav-filter-btn" class="tool-btn-outline" type="button" aria-pressed="false">★ Избранное</button>
-      <button id="mask-el-btn" class="tool-btn-outline" type="button">Скрыть греческий</button>
-      <button id="mask-ru-btn" class="tool-btn-outline" type="button">Скрыть перевод</button>
-      <button id="review-btn" class="tool-btn-primary" type="button">Повторить</button>
-      <button id="print-btn" class="tool-btn-outline" type="button">Печать</button>
+    <div id="active-filters-bar" class="active-filters-bar" hidden>
+      <span id="active-filters-text"></span>
+      <button id="reset-filters-btn" class="active-filters-reset" type="button">Сбросить</button>
     </div>
-
-    <nav class="section-jumps" aria-label="Разделы темы">
-      ${topic.sections
-        .map(
-          (s) => `<a class="jump-link" href="#${escapeHtml(s.id)}">${escapeHtml(s.titleRu)}</a>`
-        )
-        .join('')}
-      ${dialogue ? '<a class="jump-link jump-link-dialogue" href="#dialogue">Мини-диалог</a>' : ''}
-    </nav>
 
     ${tipHtml}
 
     <div id="empty-state" class="empty-state">
-      По вашему запросу ничего не найдено. Попробуйте очистить поиск или переключить уровень.
+      Ничего не найдено.
     </div>
 
     ${topic.sections.map((s) => renderSection(topic.slug, s)).join('')}
@@ -731,12 +724,15 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
     }
   </main>
 
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <span><a href="../">← На главную Greek Sheets</a></span>
-      <span>Подсказка: в режиме скрытия кликните на карточку, чтобы подсмотреть ответ</span>
-    </div>
-  </footer>
+  ${renderToolsMenu({
+    searchPlaceholder: 'Поиск по теме...',
+    showLevels: true,
+    jumps,
+    extraLinks: [
+      { href: '../', label: '← Все темы' },
+      { href: '../lessons/', label: 'Уроки' },
+    ],
+  })}
 
   ${renderReviewModal()}
 
@@ -749,11 +745,6 @@ export function renderTopicPage(topic: Topic, allTopics: Topic[]): string {
 }
 
 export function renderLessonsIndexPage(lessons: Lesson[]): string {
-  const totalWords = lessons.reduce(
-    (sum, l) => sum + l.sections.reduce((s, sec) => s + sec.items.length, 0),
-    0
-  );
-
   const cardsHtml = lessons
     .map((lesson) => {
       const wordCount = lesson.sections.reduce((s, sec) => s + sec.items.length, 0);
@@ -761,22 +752,19 @@ export function renderLessonsIndexPage(lessons: Lesson[]): string {
       const exCount = lesson.exercises ? lesson.exercises.length : 0;
       const parts = [pluralRu(wordCount, 'слово', 'слова', 'слов')];
       if (qCount > 0) parts.push(pluralRu(qCount, 'вопрос', 'вопроса', 'вопросов'));
-      if (exCount > 0) parts.push(pluralRu(exCount, 'упражнение', 'упражнения', 'упражнений'));
+      if (exCount > 0) parts.push(pluralRu(exCount, 'текст', 'текста', 'текстов'));
 
       return `
-      <a class="topic-card" href="./${escapeHtml(lesson.slug)}/" data-accent="${lesson.accent}">
-        <div>
-          <div class="topic-card-top">
-            <span class="lesson-num-badge">Урок ${lesson.number}</span>
-            <span class="badge badge-muted">${escapeHtml(lesson.date)}</span>
-          </div>
-          <h2>${escapeHtml(lesson.titleRu)}</h2>
-          <div class="topic-card-el" lang="el">${escapeHtml(lesson.titleEl)}</div>
-          <p>${escapeHtml(lesson.subtitle)}</p>
+      <a class="lesson-preview-card" href="./${escapeHtml(lesson.slug)}/" data-accent="${lesson.accent}">
+        <div class="lesson-preview-top">
+          <span class="badge badge-a1">Урок ${lesson.number}</span>
+          <span class="lesson-date">${escapeHtml(lesson.date)}</span>
         </div>
-        <div class="topic-card-footer">
+        <div class="lesson-preview-title">${escapeHtml(lesson.titleRu)}</div>
+        <div class="lesson-preview-el" lang="el">${escapeHtml(lesson.titleEl)}</div>
+        <div class="lesson-preview-foot">
           <span>${parts.join(' · ')}</span>
-          <span class="topic-card-cta">Открыть →</span>
+          <span class="topic-card-cta">→</span>
         </div>
       </a>`;
     })
@@ -784,51 +772,29 @@ export function renderLessonsIndexPage(lessons: Lesson[]): string {
 
   return `${renderHead(
     'Уроки (Μαθήματα) — Greek Sheets',
-    'Конспекты уроков греческого языка по датам: слова, грамматика, вопросы и упражнения.',
+    'Конспекты уроков греческого языка по датам.',
     '../'
   )}
 <body data-sw="../sw.js" data-assets="../assets/">
   <header class="topbar">
     <div class="container topbar-inner">
-      <a class="back-link" href="../">← На главную</a>
+      <a class="back-link" href="../">← Главная</a>
       <div class="topbar-actions">
-        <nav class="topbar-nav" aria-label="Уроки">
-          ${lessons
-            .map(
-              (l) =>
-                `<a class="topbar-pill" href="./${escapeHtml(l.slug)}/">Урок ${l.number} · ${escapeHtml(l.date)}</a>`
-            )
-            .join('')}
-        </nav>
         ${renderThemeToggle()}
       </div>
     </div>
   </header>
 
-  <main class="container">
-    <section class="hero">
-      <div class="hero-eyebrow">Μαθήματα · Конспекты</div>
-      <h1>Уроки с преподавателем</h1>
-      <p class="hero-desc">
-        Слова, грамматические заметки, вопросы для разговора и упражнения, разложенные по урокам и датам.
-      </p>
-      <div class="hero-meta">
-        <span class="badge badge-a1">${pluralRu(lessons.length, 'урок', 'урока', 'уроков')}</span>
-        <span class="badge badge-muted">${pluralRu(totalWords, 'слово', 'слова', 'слов')}</span>
-      </div>
-    </section>
+  <main class="container page-main">
+    <header class="page-head">
+      <h1>Уроки</h1>
+      <div class="page-head-el" lang="el">Μαθήματα</div>
+    </header>
 
-    <section class="topics-grid" aria-label="Список уроков">
+    <section class="lessons-preview-grid" aria-label="Список уроков">
       ${cardsHtml}
     </section>
   </main>
-
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <span><a href="../">← Все тематические листы</a></span>
-      <span>Greek Sheets · Μαθήματα</span>
-    </div>
-  </footer>
 
   <script src="../assets/app.js"></script>
 </body>
@@ -837,7 +803,6 @@ export function renderLessonsIndexPage(lessons: Lesson[]): string {
 }
 
 export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
-  const wordCount = lesson.sections.reduce((s, sec) => s + sec.items.length, 0);
   const idx = allLessons.findIndex((l) => l.slug === lesson.slug);
   const prevLesson = idx > 0 ? allLessons[idx - 1] : null;
   const nextLesson = idx >= 0 && idx < allLessons.length - 1 ? allLessons[idx + 1] : null;
@@ -848,7 +813,7 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
       <section class="lesson-grammar-section" id="grammar">
         <div class="section-header">
           <div class="section-title-group">
-            <h2>Грамматика урока</h2>
+            <h2>Грамматика</h2>
             <span class="section-el" lang="el">Γραμματική</span>
           </div>
           <span class="section-count">${lesson.grammarNotes.length}</span>
@@ -881,7 +846,7 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
                 <div class="question-ru">${escapeHtml(q.ru)}</div>
                 ${q.note ? `<div class="entry-note">${escapeHtml(q.note)}</div>` : ''}
               </div>
-              <button class="speak-btn" type="button" data-speak="${escapeHtml(q.el)}" title="Прослушать вопрос" aria-label="Прослушать вопрос">
+              <button class="speak-btn" type="button" data-speak="${escapeHtml(q.el)}" title="Прослушать" aria-label="Прослушать">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                   <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
@@ -894,7 +859,7 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
                 ? `<div class="question-answer">
                     <div class="question-answer-head">
                       <span class="question-answer-label">Ответ</span>
-                      <button class="speak-btn" type="button" data-speak="${escapeHtml(q.answerEl)}" title="Прослушать ответ" aria-label="Прослушать ответ">
+                      <button class="speak-btn" type="button" data-speak="${escapeHtml(q.answerEl)}" title="Прослушать" aria-label="Прослушать">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                           <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
@@ -925,7 +890,7 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
       <section class="lesson-links-section" id="links">
         <div class="section-header">
           <div class="section-title-group">
-            <h2>Материалы и ссылки</h2>
+            <h2>Ссылки</h2>
             <span class="section-el" lang="el">Σύνδεσμοι</span>
           </div>
         </div>
@@ -936,7 +901,6 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
             <a class="lesson-link-card" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">
               <div>
                 <strong>${escapeHtml(link.title)}</strong>
-                ${link.note ? `<span>${escapeHtml(link.note)}</span>` : ''}
                 <div class="lesson-link-url">${escapeHtml(link.url)}</div>
               </div>
               <span class="topic-card-cta" aria-hidden="true">↗</span>
@@ -947,6 +911,14 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
       </section>`
       : '';
 
+  const jumps = [
+    ...lesson.sections.map((s) => ({ href: `#${s.id}`, label: s.titleRu })),
+    ...(lesson.grammarNotes?.length ? [{ href: '#grammar', label: 'Грамматика' }] : []),
+    ...(lesson.questions ? [{ href: '#questions', label: 'Вопросы' }] : []),
+    ...(lesson.exercises?.map((ex) => ({ href: `#${ex.id}`, label: ex.titleEl })) ?? []),
+    ...(lesson.links?.length ? [{ href: '#links', label: 'Ссылки' }] : []),
+  ];
+
   return `${renderHead(
     `Урок ${lesson.number} (${lesson.date}) — ${lesson.titleRu} · Greek Sheets`,
     lesson.subtitle,
@@ -955,67 +927,31 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
 <body data-accent="${lesson.accent}" data-sw="../../sw.js" data-assets="../../assets/">
   <header class="topbar">
     <div class="container topbar-inner">
-      <a class="back-link" href="../">← Все уроки</a>
+      <a class="back-link" href="../">← Уроки</a>
       <div class="topbar-actions">
-        <nav class="topbar-nav" aria-label="Переключение уроков">
-          ${allLessons
-            .map(
-              (l) =>
-                `<a class="topbar-pill ${l.slug === lesson.slug ? 'active' : ''}" href="../${escapeHtml(l.slug)}/">Урок ${l.number} · ${escapeHtml(l.date)}</a>`
-            )
-            .join('')}
-          <a class="topbar-pill" href="../../">Темы</a>
-        </nav>
+        <button id="review-btn" class="tool-btn-primary" type="button">Повторить</button>
+        ${renderToolsMenuTrigger()}
         ${renderThemeToggle()}
       </div>
     </div>
   </header>
 
-  <main class="container">
-    <section class="hero">
-      <div class="hero-eyebrow">Урок ${lesson.number} · ${escapeHtml(lesson.date)}</div>
-      <h1>${escapeHtml(lesson.titleRu)}</h1>
-      <div class="hero-el" lang="el">${escapeHtml(lesson.titleEl)}</div>
-      <p class="hero-desc">${escapeHtml(lesson.subtitle)}</p>
-      <div class="hero-meta">
-        <span class="badge badge-a1">${escapeHtml(lesson.date)}</span>
-        <span class="badge badge-muted">${pluralRu(wordCount, 'слово', 'слова', 'слов')}</span>
-        ${lesson.questions ? `<span class="badge badge-muted">${pluralRu(lesson.questions.items.length, 'вопрос', 'вопроса', 'вопросов')}</span>` : ''}
-        ${lesson.exercises ? `<span class="badge badge-a2">${pluralRu(lesson.exercises.length, 'упражнение', 'упражнения', 'упражнений')}</span>` : ''}
+  <main class="container page-main">
+    <header class="page-head">
+      <div class="page-head-row">
+        <h1>Урок ${lesson.number} · ${escapeHtml(lesson.titleRu)}</h1>
+        <span class="badge badge-muted">${escapeHtml(lesson.date)}</span>
       </div>
-    </section>
+      <div class="page-head-el" lang="el">${escapeHtml(lesson.titleEl)}</div>
+    </header>
 
-    <div class="toolbar" role="region" aria-label="Инструменты изучения">
-      <div class="search-wrap">
-        <input
-          id="search-input"
-          class="search-input"
-          type="search"
-          placeholder="Поиск по уроку..."
-          autocomplete="off"
-        />
-      </div>
-      <button id="fav-filter-btn" class="tool-btn-outline" type="button" aria-pressed="false">★ Избранное</button>
-      <button id="mask-el-btn" class="tool-btn-outline" type="button">Скрыть греческий</button>
-      <button id="mask-ru-btn" class="tool-btn-outline" type="button">Скрыть перевод</button>
-      <button id="review-btn" class="tool-btn-primary" type="button">Повторить</button>
-      <button id="print-btn" class="tool-btn-outline" type="button">Печать</button>
+    <div id="active-filters-bar" class="active-filters-bar" hidden>
+      <span id="active-filters-text"></span>
+      <button id="reset-filters-btn" class="active-filters-reset" type="button">Сбросить</button>
     </div>
 
-    <nav class="section-jumps" aria-label="Разделы урока">
-      ${lesson.sections
-        .map(
-          (s) => `<a class="jump-link" href="#${escapeHtml(s.id)}">${escapeHtml(s.titleRu)}</a>`
-        )
-        .join('')}
-      ${lesson.grammarNotes?.length ? '<a class="jump-link" href="#grammar">Грамматика</a>' : ''}
-      ${lesson.questions ? '<a class="jump-link" href="#questions">Вопросы</a>' : ''}
-      ${lesson.exercises?.map((ex) => `<a class="jump-link" href="#${escapeHtml(ex.id)}">${escapeHtml(ex.titleEl)}</a>`).join('') ?? ''}
-      ${lesson.links?.length ? '<a class="jump-link" href="#links">Ссылки</a>' : ''}
-    </nav>
-
     <div id="empty-state" class="empty-state">
-      По вашему запросу ничего не найдено.
+      Ничего не найдено.
     </div>
 
     ${lesson.sections.map((s) => renderSection(`lesson-${lesson.number}`, s)).join('')}
@@ -1029,21 +965,25 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
     ${linksHtml}
 
     <section class="other-topics">
-      <h2 class="other-topics-title">Навигация по урокам</h2>
       <div class="other-topics-list">
         ${prevLesson ? `<a class="other-topic-link" href="../${escapeHtml(prevLesson.slug)}/">← Урок ${prevLesson.number} (${escapeHtml(prevLesson.date)})</a>` : ''}
-        <a class="other-topic-link" href="../">Все уроки (${allLessons.length})</a>
+        <a class="other-topic-link" href="../">Все уроки</a>
         ${nextLesson ? `<a class="other-topic-link" href="../${escapeHtml(nextLesson.slug)}/">Урок ${nextLesson.number} (${escapeHtml(nextLesson.date)}) →</a>` : ''}
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <span><a href="../../">← На главную Greek Sheets</a></span>
-      <span>Урок ${lesson.number} · ${escapeHtml(lesson.date)}</span>
-    </div>
-  </footer>
+  ${renderToolsMenu({
+    searchPlaceholder: 'Поиск по уроку...',
+    showLevels: false,
+    jumps,
+    extraLinks: [
+      ...allLessons
+        .filter((l) => l.slug !== lesson.slug)
+        .map((l) => ({ href: `../${l.slug}/`, label: `Урок ${l.number} · ${l.date}` })),
+      { href: '../../', label: 'Все темы' },
+    ],
+  })}
 
   ${renderReviewModal()}
 

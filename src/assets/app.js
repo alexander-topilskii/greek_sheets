@@ -142,6 +142,54 @@
     favFilterBtn.textContent = count > 0 ? `★ Избранное (${count})` : '★ Избранное';
   }
 
+  const toolsMenuBtn = document.getElementById('tools-menu-btn');
+  const toolsMenu = document.getElementById('tools-menu');
+  const toolsActiveDot = document.getElementById('tools-active-dot');
+  const activeFiltersBar = document.getElementById('active-filters-bar');
+  const activeFiltersText = document.getElementById('active-filters-text');
+  const resetFiltersBtn = document.getElementById('reset-filters-btn');
+
+  function openToolsMenu() {
+    if (!toolsMenu) return;
+    toolsMenu.hidden = false;
+    document.body.classList.add('modal-open');
+    if (toolsMenuBtn) toolsMenuBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeToolsMenu() {
+    if (!toolsMenu || toolsMenu.hidden) return;
+    toolsMenu.hidden = true;
+    document.body.classList.remove('modal-open');
+    if (toolsMenuBtn) toolsMenuBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  if (toolsMenuBtn && toolsMenu) {
+    toolsMenuBtn.addEventListener('click', () => {
+      if (toolsMenu.hidden) openToolsMenu();
+      else closeToolsMenu();
+    });
+    toolsMenu.querySelectorAll('[data-close-tools]').forEach((el) => {
+      el.addEventListener('click', closeToolsMenu);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !toolsMenu.hidden) closeToolsMenu();
+    });
+  }
+
+  function updateActiveFiltersIndicator() {
+    const parts = [];
+    if (query.trim()) parts.push(`«${query.trim()}»`);
+    if (activeLevel !== 'all') parts.push(activeLevel);
+    if (onlyFavorites) parts.push('★ Избранное');
+    if (document.body.classList.contains('mask-el')) parts.push('Скрыт греческий');
+    if (document.body.classList.contains('mask-ru')) parts.push('Скрыт перевод');
+
+    const hasActive = parts.length > 0;
+    if (toolsActiveDot) toolsActiveDot.hidden = !hasActive;
+    if (activeFiltersBar) activeFiltersBar.hidden = !hasActive;
+    if (activeFiltersText) activeFiltersText.textContent = parts.join(' · ');
+  }
+
   function applyFilters() {
     const q = normalize(query.trim());
     let totalVisible = 0;
@@ -176,6 +224,28 @@
     if (emptyState) {
       emptyState.classList.toggle('visible', totalVisible === 0);
     }
+    updateActiveFiltersIndicator();
+  }
+
+  if (resetFiltersBtn) {
+    resetFiltersBtn.addEventListener('click', () => {
+      query = '';
+      if (searchInput) searchInput.value = '';
+      activeLevel = 'all';
+      levelButtons.forEach((b) =>
+        b.classList.toggle('active', b.getAttribute('data-level-filter') === 'all')
+      );
+      onlyFavorites = false;
+      if (favFilterBtn) {
+        favFilterBtn.classList.remove('active');
+        favFilterBtn.setAttribute('aria-pressed', 'false');
+      }
+      document.body.classList.remove('mask-el', 'mask-ru');
+      if (maskElBtn) maskElBtn.classList.remove('active');
+      if (maskRuBtn) maskRuBtn.classList.remove('active');
+      clearRevealed();
+      applyFilters();
+    });
   }
 
   // Initialize topic page favorite buttons
@@ -236,6 +306,7 @@
       }
       maskElBtn.classList.toggle('active', next);
       clearRevealed();
+      updateActiveFiltersIndicator();
     });
   }
 
@@ -249,6 +320,7 @@
       }
       maskRuBtn.classList.toggle('active', next);
       clearRevealed();
+      updateActiveFiltersIndicator();
     });
   }
 
@@ -348,7 +420,7 @@
         card.classList.toggle('is-practice', next);
         practiceBtn.classList.toggle('active', next);
         practiceBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
-        practiceBtn.textContent = next ? 'Показать все ответы' : 'Режим тренировки';
+        practiceBtn.textContent = next ? 'Ответы' : 'Тренировка';
         blanks.forEach((b) => b.classList.remove('is-revealed'));
       });
     }
@@ -383,7 +455,7 @@
           if (reading) {
             window.speechSynthesis.cancel();
             reading = false;
-            speakBtn.textContent = '▶ Прослушать';
+            speakBtn.textContent = '▶';
             return;
           }
           const text = speakBtn.getAttribute('data-speak-text');
@@ -393,14 +465,14 @@
           utt.lang = 'el-GR';
           utt.rate = 0.9;
           reading = true;
-          speakBtn.textContent = '■ Остановить';
+          speakBtn.textContent = '■';
           utt.onend = () => {
             reading = false;
-            speakBtn.textContent = '▶ Прослушать';
+            speakBtn.textContent = '▶';
           };
           utt.onerror = () => {
             reading = false;
-            speakBtn.textContent = '▶ Прослушать';
+            speakBtn.textContent = '▶';
           };
           window.speechSynthesis.speak(utt);
         });
@@ -633,6 +705,24 @@
     }
   }
 
+  const homeSearchToggle = document.getElementById('home-search-toggle');
+  const homeSearchDrawer = document.getElementById('home-search-drawer');
+
+  if (homeSearchToggle && homeSearchDrawer) {
+    homeSearchToggle.addEventListener('click', () => {
+      const nextOpen = homeSearchDrawer.hidden;
+      homeSearchDrawer.hidden = !nextOpen;
+      homeSearchToggle.classList.toggle('active', nextOpen);
+      homeSearchToggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+      if (nextOpen && globalSearchInput) {
+        globalSearchInput.focus();
+      } else if (!nextOpen && globalSearchInput && globalSearchInput.value) {
+        globalSearchInput.value = '';
+        renderHomeResults();
+      }
+    });
+  }
+
   if (globalSearchInput || homeFavToggle) {
     updateHomeFavBadge();
 
@@ -654,6 +744,11 @@
     if (globalResultsClear) {
       globalResultsClear.addEventListener('click', () => {
         if (globalSearchInput) globalSearchInput.value = '';
+        if (homeSearchDrawer) homeSearchDrawer.hidden = true;
+        if (homeSearchToggle) {
+          homeSearchToggle.classList.remove('active');
+          homeSearchToggle.setAttribute('aria-expanded', 'false');
+        }
         homeShowFavorites = false;
         if (homeFavToggle) {
           homeFavToggle.classList.remove('active');
