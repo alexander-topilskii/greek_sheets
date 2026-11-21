@@ -75,6 +75,8 @@ export interface Lesson {
   titleEl: string;
   subtitle: string;
   accent: 'aegean' | 'olive' | 'terracotta';
+  /** Slugs of related topic sheets (e.g. ['location', 'travel']) */
+  relatedTopics?: string[];
   /** Structured vocabulary & phrase sections (verbs sections open 3D Verb Cube!) */
   sections: TopicSection[];
   /** Grammar explanations from the teacher */

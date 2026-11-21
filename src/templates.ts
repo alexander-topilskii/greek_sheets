@@ -802,10 +802,31 @@ export function renderLessonsIndexPage(lessons: Lesson[]): string {
 `;
 }
 
-export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
+export function renderLessonPage(
+  lesson: Lesson,
+  allLessons: Lesson[],
+  allTopics: Topic[]
+): string {
   const idx = allLessons.findIndex((l) => l.slug === lesson.slug);
   const prevLesson = idx > 0 ? allLessons[idx - 1] : null;
   const nextLesson = idx >= 0 && idx < allLessons.length - 1 ? allLessons[idx + 1] : null;
+  const relatedTopicObjs = (lesson.relatedTopics ?? [])
+    .map((slug) => allTopics.find((t) => t.slug === slug))
+    .filter((t): t is Topic => Boolean(t));
+
+  const relatedTopicsHtml =
+    relatedTopicObjs.length > 0
+      ? `
+    <div class="lesson-related-topics" aria-label="Темы урока">
+      <span class="lesson-related-label">Темы урока:</span>
+      ${relatedTopicObjs
+        .map(
+          (t) =>
+            `<a class="related-topic-pill" href="../../${escapeHtml(t.slug)}/"><span>${t.icon}</span><span>${escapeHtml(t.titleRu)}</span><span aria-hidden="true">↗</span></a>`
+        )
+        .join('')}
+    </div>`
+      : '';
 
   const grammarHtml =
     lesson.grammarNotes && lesson.grammarNotes.length > 0
@@ -943,6 +964,7 @@ export function renderLessonPage(lesson: Lesson, allLessons: Lesson[]): string {
         <span class="badge badge-muted">${escapeHtml(lesson.date)}</span>
       </div>
       <div class="page-head-el" lang="el">${escapeHtml(lesson.titleEl)}</div>
+      ${relatedTopicsHtml}
     </header>
 
     <div id="active-filters-bar" class="active-filters-bar" hidden>

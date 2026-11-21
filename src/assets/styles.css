@@ -2419,6 +2419,38 @@ body.mask-ru .question-card {
   color: var(--accent);
 }
 
+.lesson-related-topics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.lesson-related-label {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+
+.related-topic-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  transition: opacity 0.15s ease, transform 0.12s ease;
+}
+
+.related-topic-pill:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
 .icon-btn {
   appearance: none;
   position: relative;

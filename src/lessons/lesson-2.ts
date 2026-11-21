@@ -8,6 +8,7 @@ export const lesson2: Lesson = {
   titleEl: 'Η γειτονιά μου, προθέσεις & μεταφορές',
   subtitle: 'Разница ότι и που, все предлоги места, 10 вопросов про транспорт и текст-упражнение «Η γειτονιά μου».',
   accent: 'olive',
+  relatedTopics: ['location', 'travel'],
   sections: [
     {
       id: 'verbs',

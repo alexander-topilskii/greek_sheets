@@ -204,7 +204,7 @@ function build(): void {
   for (const lesson of lessons) {
     const lessonDir = path.join(lessonsRoot, lesson.slug);
     ensureDir(lessonDir);
-    const lessonHtml = renderLessonPage(lesson, lessons);
+    const lessonHtml = renderLessonPage(lesson, lessons, topics);
     fs.writeFileSync(path.join(lessonDir, 'index.html'), lessonHtml, 'utf8');
     hash.update(lessonHtml);
   }
