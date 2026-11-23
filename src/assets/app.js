@@ -149,18 +149,50 @@
   const activeFiltersText = document.getElementById('active-filters-text');
   const resetFiltersBtn = document.getElementById('reset-filters-btn');
 
+  const openModalStack = [];
+
+  function pushModalHistory(id, closeFn) {
+    if (openModalStack.some((item) => item.id === id)) return;
+    openModalStack.push({ id, close: closeFn });
+    if (window.history && typeof window.history.pushState === 'function') {
+      window.history.pushState({ greekSheetsModal: id }, '');
+    }
+  }
+
+  function popModalHistory(id, opts) {
+    const idx = openModalStack.findIndex((item) => item.id === id);
+    if (idx === -1) return;
+    openModalStack.splice(idx, 1);
+    const skipHistoryBack = opts && opts.skipHistoryBack;
+    if (!skipHistoryBack && window.history && typeof window.history.back === 'function') {
+      window.history.back();
+    }
+  }
+
+  window.addEventListener('popstate', () => {
+    if (openModalStack.length === 0) return;
+    const top = openModalStack.pop();
+    if (top && typeof top.close === 'function') {
+      top.close({ fromPopstate: true });
+    }
+  });
+
   function openToolsMenu() {
-    if (!toolsMenu) return;
+    if (!toolsMenu || !toolsMenu.hidden) return;
     toolsMenu.hidden = false;
     document.body.classList.add('modal-open');
     if (toolsMenuBtn) toolsMenuBtn.setAttribute('aria-expanded', 'true');
+    pushModalHistory('tools', closeToolsMenu);
   }
 
-  function closeToolsMenu() {
+  function closeToolsMenu(opts) {
     if (!toolsMenu || toolsMenu.hidden) return;
     toolsMenu.hidden = true;
     document.body.classList.remove('modal-open');
     if (toolsMenuBtn) toolsMenuBtn.setAttribute('aria-expanded', 'false');
+    if (!opts || !opts.fromPopstate) {
+      popModalHistory('tools', opts);
+    }
   }
 
   if (toolsMenuBtn && toolsMenu) {
@@ -169,7 +201,20 @@
       else closeToolsMenu();
     });
     toolsMenu.querySelectorAll('[data-close-tools]').forEach((el) => {
-      el.addEventListener('click', closeToolsMenu);
+      el.addEventListener('click', (e) => {
+        const href = el.tagName === 'A' ? el.getAttribute('href') : '';
+        if (href && href.startsWith('#')) {
+          e.preventDefault();
+          closeToolsMenu({ skipHistoryBack: true });
+          if (window.history && typeof window.history.replaceState === 'function') {
+            window.history.replaceState(null, '', href);
+          }
+          const target = document.querySelector(href);
+          if (target) target.scrollIntoView();
+          return;
+        }
+        closeToolsMenu();
+      });
     });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !toolsMenu.hidden) closeToolsMenu();
@@ -708,18 +753,37 @@
   const homeSearchToggle = document.getElementById('home-search-toggle');
   const homeSearchDrawer = document.getElementById('home-search-drawer');
 
+  function openHomeSearch() {
+    if (!homeSearchDrawer || !homeSearchDrawer.hidden) return;
+    homeSearchDrawer.hidden = false;
+    if (homeSearchToggle) {
+      homeSearchToggle.classList.add('active');
+      homeSearchToggle.setAttribute('aria-expanded', 'true');
+    }
+    pushModalHistory('home-search', closeHomeSearch);
+    if (globalSearchInput) globalSearchInput.focus();
+  }
+
+  function closeHomeSearch(opts) {
+    if (!homeSearchDrawer || homeSearchDrawer.hidden) return;
+    homeSearchDrawer.hidden = true;
+    if (homeSearchToggle) {
+      homeSearchToggle.classList.remove('active');
+      homeSearchToggle.setAttribute('aria-expanded', 'false');
+    }
+    if (globalSearchInput && globalSearchInput.value) {
+      globalSearchInput.value = '';
+      renderHomeResults();
+    }
+    if (!opts || !opts.fromPopstate) {
+      popModalHistory('home-search', opts);
+    }
+  }
+
   if (homeSearchToggle && homeSearchDrawer) {
     homeSearchToggle.addEventListener('click', () => {
-      const nextOpen = homeSearchDrawer.hidden;
-      homeSearchDrawer.hidden = !nextOpen;
-      homeSearchToggle.classList.toggle('active', nextOpen);
-      homeSearchToggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
-      if (nextOpen && globalSearchInput) {
-        globalSearchInput.focus();
-      } else if (!nextOpen && globalSearchInput && globalSearchInput.value) {
-        globalSearchInput.value = '';
-        renderHomeResults();
-      }
+      if (homeSearchDrawer.hidden) openHomeSearch();
+      else closeHomeSearch();
     });
   }
 
@@ -743,18 +807,17 @@
 
     if (globalResultsClear) {
       globalResultsClear.addEventListener('click', () => {
-        if (globalSearchInput) globalSearchInput.value = '';
-        if (homeSearchDrawer) homeSearchDrawer.hidden = true;
-        if (homeSearchToggle) {
-          homeSearchToggle.classList.remove('active');
-          homeSearchToggle.setAttribute('aria-expanded', 'false');
-        }
         homeShowFavorites = false;
         if (homeFavToggle) {
           homeFavToggle.classList.remove('active');
           homeFavToggle.setAttribute('aria-pressed', 'false');
         }
-        renderHomeResults();
+        if (homeSearchDrawer && !homeSearchDrawer.hidden) {
+          closeHomeSearch();
+        } else {
+          if (globalSearchInput) globalSearchInput.value = '';
+          renderHomeResults();
+        }
       });
     }
   }
@@ -787,9 +850,21 @@
   let deck = [];
   let currentIndex = 0;
 
+  function isSentenceCard(card) {
+    if (card.closest('.phrase-list')) return true;
+    const elNode = card.querySelector('.entry-el');
+    const elText = elNode ? elNode.textContent.trim() : '';
+    if (!elText) return false;
+    if (elText.includes('—')) return true;
+    if (/[.;!?]$/.test(elText) && elText.split(/\s+/).length >= 5) return true;
+    return false;
+  }
+
   function collectCards() {
-    const visible = entries.filter((card) => !card.classList.contains('is-hidden'));
-    const source = visible.length > 0 ? visible : entries;
+    const nonSentenceEntries = entries.filter((card) => !isSentenceCard(card));
+    const pool = nonSentenceEntries.length > 0 ? nonSentenceEntries : entries;
+    const visible = pool.filter((card) => !card.classList.contains('is-hidden'));
+    const source = visible.length > 0 ? visible : pool;
 
     return source.map((card) => {
       const elNode = card.querySelector('.entry-el');
@@ -879,20 +954,24 @@
   }
 
   function openReview() {
-    if (!reviewModal) return;
+    if (!reviewModal || !reviewModal.hidden) return;
     deck = shuffleArray(collectCards());
     currentIndex = 0;
     renderCard();
     reviewModal.hidden = false;
     document.body.classList.add('modal-open');
+    pushModalHistory('review', closeReview);
     if (flashcard) flashcard.focus();
   }
 
-  function closeReview() {
-    if (!reviewModal) return;
+  function closeReview(opts) {
+    if (!reviewModal || reviewModal.hidden) return;
     reviewModal.hidden = true;
     document.body.classList.remove('modal-open');
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (!opts || !opts.fromPopstate) {
+      popModalHistory('review', opts);
+    }
   }
 
   function toggleFlip() {
@@ -1246,15 +1325,20 @@
     }
 
     renderActiveVerb(resolved[0]);
+    const wasHidden = verbModal.hidden;
     verbModal.hidden = false;
     document.body.classList.add('modal-open');
+    if (wasHidden) pushModalHistory('verb', closeVerbModal);
   }
 
-  function closeVerbModal() {
-    if (!verbModal) return;
+  function closeVerbModal(opts) {
+    if (!verbModal || verbModal.hidden) return;
     verbModal.hidden = true;
     document.body.classList.remove('modal-open');
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (!opts || !opts.fromPopstate) {
+      popModalHistory('verb', opts);
+    }
   }
 
   if (verbModal) {

@@ -511,7 +511,7 @@ function renderExercise(exercise: LessonExercise): string {
   </section>`;
 }
 
-export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
+export function renderIndexPage(topics: Topic[], _lessons: Lesson[]): string {
   const cardsHtml = topics
     .map((topic) => {
       const counts = countItems(topic);
@@ -530,20 +530,6 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
     })
     .join('');
 
-  const lessonPreviewHtml = lessons
-    .map((lesson) => {
-      return `
-      <a class="lesson-preview-card" href="./lessons/${escapeHtml(lesson.slug)}/" data-accent="${lesson.accent}">
-        <div class="lesson-preview-top">
-          <span class="badge badge-a1">Урок ${lesson.number}</span>
-          <span class="lesson-date">${escapeHtml(lesson.date)}</span>
-        </div>
-        <div class="lesson-preview-title">${escapeHtml(lesson.titleRu)}</div>
-        <div class="lesson-preview-el" lang="el">${escapeHtml(lesson.titleEl)}</div>
-      </a>`;
-    })
-    .join('');
-
   return `${renderHead(
     'Greek Sheets — Ελληνικά A1–A2',
     'Тематические листы и уроки для изучения новогреческого языка уровня A1–A2.',
@@ -557,7 +543,7 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
         <span>Greek Sheets</span>
       </a>
       <div class="topbar-actions">
-        <a class="topbar-pill topbar-pill-lessons" href="./lessons/">Уроки</a>
+        <a class="topbar-pill topbar-pill-lessons" href="./lessons/">В уроки</a>
         <button id="home-fav-toggle" class="icon-btn icon-btn-fav" type="button" aria-pressed="false" title="Избранное" aria-label="Избранное">
           <span aria-hidden="true">★</span>
           <span id="home-fav-count" class="icon-badge">0</span>
@@ -602,19 +588,6 @@ export function renderIndexPage(topics: Topic[], lessons: Lesson[]): string {
     </section>
 
     <div id="home-browse-content">
-      <section class="home-lessons-block" aria-label="Уроки">
-        <div class="home-block-header">
-          <div class="home-block-title-group">
-            <h2>Уроки</h2>
-            <span class="section-el" lang="el">Μαθήματα</span>
-          </div>
-          <a class="home-block-link" href="./lessons/">Все (${lessons.length}) →</a>
-        </div>
-        <div class="lessons-preview-grid">
-          ${lessonPreviewHtml}
-        </div>
-      </section>
-
       <div class="home-block-header">
         <div class="home-block-title-group">
           <h2>Темы</h2>
